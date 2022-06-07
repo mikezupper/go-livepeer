@@ -3,6 +3,14 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/cenkalti/backoff"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -15,13 +23,6 @@ import (
 	"github.com/livepeer/go-livepeer/pm"
 	"github.com/livepeer/lpms/ffmpeg"
 	"github.com/pkg/errors"
-	"math/big"
-	"net/http"
-	"net/url"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const MainnetChainId = 1
@@ -593,7 +594,7 @@ func unbondHandler(client eth.LivepeerEthClient) http.Handler {
 			respond500(w, err.Error())
 			return
 		}
-		respondOk(w, nil)
+		respondOk(w, tx.Hash().Bytes())
 	}))
 }
 
