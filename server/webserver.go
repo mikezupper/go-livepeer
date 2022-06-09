@@ -3,6 +3,7 @@ package server
 import (
 	"flag"
 	"net/http"
+
 	// pprof adds handlers to default mux via `init()`
 	_ "net/http/pprof"
 
