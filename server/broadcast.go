@@ -61,7 +61,6 @@ type SegFlightMetadata struct {
 }
 
 func (cfg *BroadcastConfig) MaxPrice() *big.Rat {
-	sp.sel.Size()
 	cfg.mu.RLock()
 	defer cfg.mu.RUnlock()
 	//clog.V(common.VERBOSE).Infof("MaxPrice =%s",cfg.maxPrice);
