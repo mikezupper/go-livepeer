@@ -100,7 +100,7 @@ type SessionPool struct {
 
 func NewSessionPool(mid core.ManifestID, poolSize, numOrchs int, sus *suspender, createSession sessionsCreator,
 	sel BroadcastSessionsSelector) *SessionPool {
-		//clog.V(common.VERBOSE).Infof("NewSessionPool poolSize[%s] numOrch[%s]",poolSize,numOrchs);
+	//clog.V(common.VERBOSE).Infof("NewSessionPool poolSize[%s] numOrch[%s]",poolSize,numOrchs);
 
 	return &SessionPool{
 		mid:            mid,
@@ -133,15 +133,19 @@ func (sp *SessionPool) refreshSessions(ctx context.Context) {
 	}()
 	sp.lock.Lock()
 	if sp.finished || sp.refreshing {
+		clog.V(common.VERBOSE).Infof(ctx, "refreshSessions - session pool finshed or refreshing-  orchs=%d", sp.sel.Size())
 		sp.lock.Unlock()
 		return
 	}
 	sp.refreshing = true
 	sp.lock.Unlock()
 
+	clog.V(common.VERBOSE).Infof(ctx, "refreshSessions - session signal refresh-  orchs=%d", sp.sel.Size())
+
 	sp.sus.signalRefresh()
 
 	newBroadcastSessions, err := sp.createSessions()
+	clog.V(common.VERBOSE).Infof(ctx, "refreshSessions - session created -  orchs=%d", sp.sel.Size())
 	if err != nil {
 		sp.lock.Lock()
 		sp.refreshing = false
@@ -150,7 +154,7 @@ func (sp *SessionPool) refreshSessions(ctx context.Context) {
 	}
 
 	// if newBroadcastSessions is empty, exit without refreshing list
-	clog.V(common.VERBOSE).Infof(ctx,"refreshSessions  - newBroadcastSessions is empty, exit without refreshing list. if 0==0 (0 = [%s])",len(newBroadcastSessions));
+	clog.V(common.VERBOSE).Infof(ctx, "refreshSessions  - newBroadcastSessions is empty, exit without refreshing list. if 0==0 (0 = [%s])", len(newBroadcastSessions))
 
 	if len(newBroadcastSessions) <= 0 {
 		sp.lock.Lock()
@@ -160,7 +164,7 @@ func (sp *SessionPool) refreshSessions(ctx context.Context) {
 	}
 
 	uniqueSessions := make([]*BroadcastSession, 0, len(newBroadcastSessions))
-	clog.V(common.VERBOSE).Infof(ctx,"refreshSessions  - uniqueSessions  [%s])",len(uniqueSessions));
+	clog.V(common.VERBOSE).Infof(ctx, "refreshSessions  - uniqueSessions  orchs=[%s] ", sp.sel.Size(), len(uniqueSessions))
 
 	sp.lock.Lock()
 	defer sp.lock.Unlock()
@@ -176,6 +180,8 @@ func (sp *SessionPool) refreshSessions(ctx context.Context) {
 		}
 		uniqueSessions = append(uniqueSessions, sess)
 		sp.sessMap[sess.OrchestratorInfo.Transcoder] = sess
+		clog.V(common.VERBOSE).Infof(ctx, "refreshSessions  - session[%s] sessionMap[%s] ",sess, sp.sessMap)
+
 	}
 
 	sp.sel.Add(uniqueSessions)
