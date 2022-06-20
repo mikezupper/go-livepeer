@@ -61,8 +61,10 @@ type SegFlightMetadata struct {
 }
 
 func (cfg *BroadcastConfig) MaxPrice() *big.Rat {
+	sp.sel.Size())
 	cfg.mu.RLock()
 	defer cfg.mu.RUnlock()
+	clog.V(common.VERBOSE).Infof("MaxPrice =%s",cfg.maxPrice);
 	return cfg.maxPrice
 }
 
@@ -70,6 +72,7 @@ func (cfg *BroadcastConfig) SetMaxPrice(price *big.Rat) {
 	cfg.mu.Lock()
 	defer cfg.mu.Unlock()
 	cfg.maxPrice = price
+	clog.V(common.VERBOSE).Infof("SetMaxPrice = %s",price);
 
 	if monitor.Enabled {
 		monitor.MaxTranscodingPrice(price)
@@ -98,6 +101,7 @@ type SessionPool struct {
 
 func NewSessionPool(mid core.ManifestID, poolSize, numOrchs int, sus *suspender, createSession sessionsCreator,
 	sel BroadcastSessionsSelector) *SessionPool {
+		clog.V(common.VERBOSE).Infof("NewSessionPool poolSize[%s] numOrch[%s]",poolSize,numOrchs);
 
 	return &SessionPool{
 		mid:            mid,
@@ -115,14 +119,16 @@ func (sp *SessionPool) suspend(orch string) {
 	numOrchs := math.Max(1, float64(sp.numOrchs))
 	penalty := int(math.Ceil(poolSize / numOrchs))
 	sp.sus.suspend(orch, penalty)
+	clog.V(common.VERBOSE).Infof("suspend orch[%s] penalty[%s]",orch,penalty);
+
 }
 
 func (sp *SessionPool) refreshSessions(ctx context.Context) {
 	started := time.Now()
-	clog.V(common.DEBUG).Infof(ctx, "Starting session refresh")
+	clog.V(common.DEBUG).Infof(ctx, "refreshSessions - Starting session refresh")
 	defer func() {
 		sp.lock.Lock()
-		clog.V(common.DEBUG).Infof(ctx, "Ending session refresh dur=%s orchs=%d", time.Since(started),
+		clog.V(common.DEBUG).Infof(ctx, "refreshSessions - Ending session refresh dur=%s orchs=%d", time.Since(started),
 			sp.sel.Size())
 		sp.lock.Unlock()
 	}()
@@ -145,6 +151,8 @@ func (sp *SessionPool) refreshSessions(ctx context.Context) {
 	}
 
 	// if newBroadcastSessions is empty, exit without refreshing list
+	clog.V(common.VERBOSE).Infof("refreshSessions  - newBroadcastSessions is empty, exit without refreshing list. if 0==0 (0 = [%s])",len(newBroadcastSessions));
+
 	if len(newBroadcastSessions) <= 0 {
 		sp.lock.Lock()
 		sp.refreshing = false
@@ -153,6 +161,8 @@ func (sp *SessionPool) refreshSessions(ctx context.Context) {
 	}
 
 	uniqueSessions := make([]*BroadcastSession, 0, len(newBroadcastSessions))
+	clog.V(common.VERBOSE).Infof("refreshSessions  - uniqueSessions  [%s])",len(uniqueSessions));
+
 	sp.lock.Lock()
 	defer sp.lock.Unlock()
 
