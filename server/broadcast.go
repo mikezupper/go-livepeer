@@ -227,15 +227,25 @@ func selectSession(sessions []*BroadcastSession, exclude []*BroadcastSession, du
 }
 
 func (sp *SessionPool) selectSessions(ctx context.Context, sessionsNum int) []*BroadcastSession {
+	clog.V(common.VERBOSE).Infof(ctx, "selectSession  - sessionsNum [%s] ",sessionsNum)
+
 	sp.lock.Lock()
 	defer sp.lock.Unlock()
 	if sp.poolSize == 0 {
+		clog.V(common.VERBOSE).Infof(ctx, "selectSession  - pool size is 0... returning nil ")
 		return nil
 	}
+	clog.V(common.VERBOSE).Infof(ctx, "selectSession  - pool size is [%s] ",sp.poolSize)
 
 	checkSessions := func(m *SessionPool) bool {
 		numSess := m.sel.Size()
-		if numSess < int(math.Min(maxRefreshSessionsThreshold, math.Ceil(float64(m.numOrchs)/2.0))) {
+		var numOrchs = m.numOrchs;
+		var orchCeil=math.Ceil(float64(numOrchs)/2.0);
+		var refreshThresh =int(math.Min(maxRefreshSessionsThreshold, orchCeil))
+		clog.V(common.VERBOSE).Infof(ctx, "selectSession  -  (func) numSess [%s] orchCeil [%s] numOrchs[%s] / 2.0? ",numSess,refreshThresh,orchCeil,numOrchs)
+		if numSess < refreshThresh {
+			clog.V(common.VERBOSE).Infof(ctx, "selectSession  -  (func) refreshing sessions ")
+
 			go m.refreshSessions(ctx)
 		}
 		return (numSess > 0 || len(sp.lastSess) > 0)
@@ -248,6 +258,8 @@ func (sp *SessionPool) selectSessions(ctx context.Context, sessionsNum int) []*B
 		// Re-use last session if oldest segment is in-flight for < segDur
 		gotFromLast := false
 		sess = selectSession(sp.lastSess, selectedSessions, 1)
+		clog.V(common.VERBOSE).Infof(ctx, "selectSession  -  (func) check sessions [%s]",sess)
+
 		if sess == nil {
 			// Or try a new session from the available ones
 			sess = sp.sel.Select(ctx)
@@ -383,6 +395,8 @@ func (bsm *BroadcastSessionsManager) shouldRunVerification(sessions []*Broadcast
 }
 
 func NewSessionManager(ctx context.Context, node *core.LivepeerNode, params *core.StreamParameters, sel BroadcastSessionsSelectorFactory) *BroadcastSessionsManager {
+	clog.V(common.VERBOSE).Infof(ctx, "NewSessionManager  - params [%s] sel[%s]",params,sel)
+
 	var trustedPoolSize, untrustedPoolSize float64
 	if node.OrchestratorPool != nil {
 		trustedPoolSize = float64(node.OrchestratorPool.SizeWith(common.ScoreAtLeast(common.Score_Trusted)))
