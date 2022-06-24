@@ -89,10 +89,15 @@ func New(config Config) *Watcher {
 // node was offline and sends them to event subscribers. It blocks until
 // it is done backfilling or the given context is canceled.
 func (w *Watcher) BackfillEventsIfNeeded(ctx context.Context) error {
+	glog.V(5).Infof("[BackfillEventsIfNeeded] ")
+
 	events, err := w.getMissedEventsToBackfill(ctx)
+	glog.V(5).Infof("[BackfillEventsIfNeeded] events %s and err %s", events,err)
+
 	if err != nil {
 		return err
 	}
+	glog.V(5).Infof("[BackfillEventsIfNeeded] total number of events %s ", len(events))
 	if len(events) > 0 {
 		w.blockFeed.Send(w.enrichWithL1(events))
 	}
@@ -102,6 +107,8 @@ func (w *Watcher) BackfillEventsIfNeeded(ctx context.Context) error {
 // Watch starts the Watcher. It will continuously look for new blocks and blocks
 // until the given context is canceled. Typically, you want to call Watch inside a goroutine.
 func (w *Watcher) Watch(ctx context.Context) error {
+	glog.V(5).Infof("[Watch] starting block watcher with polling interval %s", w.pollingInterval)
+
 	w.Lock()
 	if w.wasStartedOnce {
 		w.Unlock()
@@ -114,9 +121,13 @@ func (w *Watcher) Watch(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			glog.V(5).Infof("[Watch] done - stop ticker ")
+
 			ticker.Stop()
 			return nil
 		case <-ticker.C:
+			glog.V(5).Infof("[Watch] sync to latest block")
+
 			if err := w.syncToLatestBlock(); err != nil {
 				glog.Errorf("blockwatch.Watcher error encountered - trying again on next polling interval err=%q", err)
 			}
@@ -129,12 +140,17 @@ func (w *Watcher) Watch(ctx context.Context) error {
 // The sink channel should have ample buffer space to avoid blocking other subscribers.
 // Slow subscribers are not dropped.
 func (w *Watcher) Subscribe(sink chan<- []*Event) event.Subscription {
+	glog.V(5).Infof("[Subscribe]  block feed subscribe to sink %s ", sink)
+
 	return w.blockScope.Track(w.blockFeed.Subscribe(sink))
 }
 
 // GetLatestBlock returns the latest block processed
 func (w *Watcher) GetLatestBlock() (*MiniHeader, error) {
+	glog.V(5).Infof("[GetLatestBlock] ")
+
 	h, err := w.stack.Peek()
+	glog.V(5).Infof("[GetLatestBlock] header %s ", h)
 	if err != nil {
 		return nil, err
 	}
@@ -144,18 +160,26 @@ func (w *Watcher) GetLatestBlock() (*MiniHeader, error) {
 // InspectRetainedBlocks returns the blocks retained in-memory by the Watcher instance. It is not
 // particularly performant and therefore should only be used for debugging and testing purposes.
 func (w *Watcher) InspectRetainedBlocks() ([]*MiniHeader, error) {
+	glog.V(5).Infof("[InspectRetainedBlocks] ")
+
 	return w.stack.Inspect()
 }
 
 func (w *Watcher) syncToLatestBlock() error {
+	glog.V(5).Infof("[syncToLatestBlock]")
+
 	w.Lock()
 	defer w.Unlock()
 	newestHeader, err := w.client.HeaderByNumber(nil)
+	glog.V(5).Infof("[syncToLatestBlock] newestHeader %s ", newestHeader)
+
 	if err != nil {
 		return err
 	}
 
 	lastSeenHeader, err := w.stack.Peek()
+	glog.V(5).Infof("[syncToLatestBlock] lastSeenHeader %s ", lastSeenHeader)
+
 	if err != nil {
 		return err
 	}
@@ -165,6 +189,8 @@ func (w *Watcher) syncToLatestBlock() error {
 	}
 
 	for i := lastSeenHeader.Number; i.Cmp(newestHeader.Number) < 0; i = i.Add(i, big.NewInt(1)) {
+		glog.V(5).Infof("[syncToLatestBlock] lastSeenHeader.Number %s  newestHeader.Number %s", lastSeenHeader.Number,newestHeader.Number)
+
 		if err := w.pollNextBlock(); err != nil {
 			return err
 		}
@@ -177,6 +203,8 @@ func (w *Watcher) syncToLatestBlock() error {
 // `startBlockDepth` supplied at instantiation.
 func (w *Watcher) pollNextBlock() error {
 	var nextBlockNumber *big.Int
+	glog.V(5).Infof("[pollNextBlock] 1. nextBlockNumber %s ", nextBlockNumber)
+
 	latestHeader, err := w.stack.Peek()
 	if err != nil {
 		return err
@@ -184,13 +212,23 @@ func (w *Watcher) pollNextBlock() error {
 	if latestHeader == nil {
 		if w.startBlockDepth == rpc.LatestBlockNumber {
 			nextBlockNumber = nil // Fetch latest block
+			glog.V(5).Infof("[pollNextBlock] 2. LATEST ALREADY! nextBlockNumber %s ", nextBlockNumber)
+
 		} else {
 			nextBlockNumber = big.NewInt(int64(w.startBlockDepth))
+			glog.V(5).Infof("[pollNextBlock] 3. nextBlockNumber %s ", nextBlockNumber)
+
 		}
 	} else {
 		nextBlockNumber = big.NewInt(0).Add(latestHeader.Number, big.NewInt(1))
+		glog.V(5).Infof("[pollNextBlock] 4. nextBlockNumber %s ", nextBlockNumber)
 	}
+	glog.V(5).Infof("[pollNextBlock] 5. nextBlockNumber %s ", nextBlockNumber)
+
 	nextHeader, err := w.client.HeaderByNumber(nextBlockNumber)
+
+	glog.V(5).Infof("[pollNextBlock] nextHeader %s ", nextHeader)
+
 	if err != nil {
 		if err == ethereum.NotFound {
 			return nil // Noop and wait next polling interval
@@ -212,7 +250,10 @@ func (w *Watcher) pollNextBlock() error {
 }
 
 func (w *Watcher) buildCanonicalChain(nextHeader *MiniHeader, events []*Event) ([]*Event, error) {
+
 	latestHeader, err := w.stack.Peek()
+	glog.V(5).Infof("[buildCanonicalChain] nextHeader %s latestHeader %s ", nextHeader,latestHeader)
+
 	if err != nil {
 		return nil, err
 	}
@@ -308,6 +349,8 @@ func (w *Watcher) addLogs(header *MiniHeader) (*MiniHeader, error) {
 // If the stored block is older then the latest block, it batch fetches the events for missing blocks,
 // re-sets the stored blocks and returns the block events found.
 func (w *Watcher) getMissedEventsToBackfill(ctx context.Context) ([]*Event, error) {
+	glog.V(5).Infof("[getMissedEventsToBackfill]  ")
+
 	events := []*Event{}
 
 	var (
@@ -317,20 +360,29 @@ func (w *Watcher) getMissedEventsToBackfill(ctx context.Context) ([]*Event, erro
 	)
 
 	latestRetainedBlock, err := w.stack.Peek()
+	glog.V(5).Infof("[getMissedEventsToBackfill] latestRetainedBlock %s",latestRetainedBlock)
+
 	if err != nil {
 		return events, err
 	}
 
 	latestBlock, err := w.client.HeaderByNumber(nil)
+	glog.V(5).Infof("[getMissedEventsToBackfill] latestBlock %s",latestBlock)
+
 	if err != nil {
 		return events, err
 	}
 	latestBlockNum := int(latestBlock.Number.Int64())
+	glog.V(5).Infof("[getMissedEventsToBackfill] latestBlockNum %s",latestBlockNum)
 
 	if latestRetainedBlock != nil {
 		latestRetainedBlockNum = int(latestRetainedBlock.Number.Int64())
+		glog.V(5).Infof("[getMissedEventsToBackfill] latestRetainedBlockNum %s",latestRetainedBlockNum)
+
 		// Events for latestRetainedBlock already processed, start at latestRetainedBlock + 1
 		startBlockNum = latestRetainedBlockNum + 1
+		glog.V(5).Infof("[getMissedEventsToBackfill] startBlockNum %s ",startBlockNum)
+
 	} else {
 		return events, nil
 	}
@@ -339,10 +391,13 @@ func (w *Watcher) getMissedEventsToBackfill(ctx context.Context) ([]*Event, erro
 		return events, nil
 	}
 
-	glog.Infof("Backfilling block events (this can take a while)...\n")
-	glog.Infof("Start block: %v		 End block: %v		Blocks elapsed: %v\n", startBlockNum, startBlockNum+blocksElapsed, blocksElapsed)
+	glog.Infof("[getMissedEventsToBackfill] Backfilling block events (this can take a while)...\n")
+	glog.Infof("[getMissedEventsToBackfill] Start block: %v		 End block: %v		Blocks elapsed: %v\n", startBlockNum, startBlockNum+blocksElapsed, blocksElapsed)
 
 	logs, furthestBlockProcessed := w.getLogsInBlockRange(ctx, startBlockNum, latestBlockNum)
+
+	glog.V(5).Infof("[getMissedEventsToBackfill] startBlockNum %s latestBlockNum %s furthestBlockProcessed %s",startBlockNum,latestBlockNum,furthestBlockProcessed)
+
 	if furthestBlockProcessed > latestRetainedBlockNum {
 		// If we have processed blocks further then the latestRetainedBlock in the DB, we
 		// want to remove all blocks from the DB and insert the furthestBlockProcessed
@@ -396,7 +451,7 @@ func (w *Watcher) getMissedEventsToBackfill(ctx context.Context) ([]*Event, erro
 				BlockHeader: blockHeader,
 			})
 		}
-		glog.Info("Done backfilling block events")
+		glog.Info("[getMissedEventsToBackfill] Done backfilling block events - startBlockNum %s latestBlockNum %s furthestBlockProcessed %s",startBlockNum,latestBlockNum,furthestBlockProcessed)
 		return events, nil
 	}
 	return events, nil
@@ -418,7 +473,10 @@ const getLogsRequestChunkSize = 3
 // batch requests are not sent. Instead, it returns all the logs it found up until the error was
 // encountered, along with the block number after which no further logs were retrieved.
 func (w *Watcher) getLogsInBlockRange(ctx context.Context, from, to int) ([]types.Log, int) {
+	glog.Info("[getLogsInBlockRange]  from %s to %s",from,to)
+
 	blockRanges := w.getSubBlockRanges(from, to, maxBlocksInGetLogsQuery)
+	glog.Info("[getLogsInBlockRange]  blockRanges %s ",blockRanges)
 
 	numChunks := 0
 	chunkChan := make(chan []*blockRange, 1000000)
