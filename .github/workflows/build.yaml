@@ -165,7 +165,7 @@ jobs:
 
       - name: Cache ffmpeg
         id: cache-ffmpeg
-        uses: actions/cache@v2.1.5
+        uses: actions/cache@v3
         with:
           path: ~/compiled
           key: ${{ runner.os }}-ffmpeg-tensorflow-${{ hashFiles('**/install_ffmpeg.sh') }}
@@ -173,7 +173,7 @@ jobs:
             ${{ runner.os }}-ffmpeg-tensorflow
 
       - name: Cache binaries
-        uses: actions/cache@v2.1.5
+        uses: actions/cache@v3
         with:
           path: ~/build
           key: ${{ runner.os }}-binaries-tensorflow-${{ github.sha }}
