@@ -232,6 +232,10 @@ func (pm *stubPlaylistManager) GetHLSMasterPlaylist() *m3u8.MasterPlaylist {
 	return nil
 }
 
+func (pm *stubPlaylistManager) GetHLSMasterPlaylistRec() *m3u8.MasterPlaylist {
+	return nil
+}
+
 func (pm *stubPlaylistManager) GetHLSMediaPlaylist(rendition string) *m3u8.MediaPlaylist {
 	return nil
 }
@@ -240,7 +244,9 @@ func (pm *stubPlaylistManager) GetOSSession() drivers.OSSession {
 	return pm.os
 }
 
-func (pm *stubPlaylistManager) Cleanup()     {}
+func (pm *stubPlaylistManager) Cleanup() {}
+func (pm *stubPlaylistManager) SaveFullPlaylist(ctx context.Context, sess drivers.OSSession) {
+}
 func (pm *stubPlaylistManager) FlushRecord() {}
 func (pm *stubPlaylistManager) GetRecordOSSession() drivers.OSSession {
 	return nil
@@ -448,7 +454,6 @@ func TestSelectSession_MultipleInFlight2(t *testing.T) {
 
 func TestSelectSession_NoSegsInFlight(t *testing.T) {
 	assert := assert.New(t)
-	ctx := context.Background()
 
 	sess := &BroadcastSession{}
 	sessList := []*BroadcastSession{sess}
@@ -457,22 +462,22 @@ func TestSelectSession_NoSegsInFlight(t *testing.T) {
 	sess.SegsInFlight = []SegFlightMetadata{
 		{startTime: time.Now().Add(time.Duration(-1) * time.Second), segDur: 1 * time.Second},
 	}
-	s := selectSession(ctx, sessList, nil, 1)
+	s := selectSession(sessList, nil, 1)
 	assert.Nil(s)
 
 	// Session has no segs in flight, latency score = 0
 	sess.SegsInFlight = nil
-	s = selectSession(ctx, sessList, nil, 1)
+	s = selectSession(sessList, nil, 1)
 	assert.Nil(s)
 
 	// Session has no segs in flight, latency score > SELECTOR_LATENCY_SCORE_THRESHOLD
 	sess.LatencyScore = SELECTOR_LATENCY_SCORE_THRESHOLD + 0.001
-	s = selectSession(ctx, sessList, nil, 1)
+	s = selectSession(sessList, nil, 1)
 	assert.Nil(s)
 
 	// Session has no segs in flight, latency score > 0 and < SELECTOR_LATENCY_SCORE_THRESHOLD
 	sess.LatencyScore = SELECTOR_LATENCY_SCORE_THRESHOLD - 0.001
-	s = selectSession(ctx, sessList, nil, 1)
+	s = selectSession(sessList, nil, 1)
 	assert.Equal(sess, s)
 }
 
