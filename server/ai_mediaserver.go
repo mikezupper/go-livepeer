@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -77,6 +78,7 @@ func startAIMediaServer(ls *LivepeerServer) error {
 func (ls *LivepeerServer) TextToImage() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -87,12 +89,14 @@ func (ls *LivepeerServer) TextToImage() http.Handler {
 			return
 		}
 
+		clog.V(common.SHORT).Infof(ctx, "[Public Metrics] model_ID=%v token_ID=%v pipeline_ID=%v", *req.ModelId, token, "text-to-image")
 		clog.V(common.VERBOSE).Infof(r.Context(), "Received TextToImage request prompt=%v model_id=%v", req.Prompt, *req.ModelId)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
+			requestToken: token,
 		}
 
 		start := time.Now()
@@ -113,7 +117,7 @@ func (ls *LivepeerServer) TextToImage() http.Handler {
 		}
 
 		took := time.Since(start)
-		clog.Infof(ctx, "Processed TextToImage request prompt=%v model_id=%v took=%v", req.Prompt, *req.ModelId, took)
+		clog.Infof(ctx, "Processed TextToImage request prompt=%v model_id=%v took=%v token=%v", req.Prompt, *req.ModelId, took, token)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -124,6 +128,7 @@ func (ls *LivepeerServer) TextToImage() http.Handler {
 func (ls *LivepeerServer) ImageToImage() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -139,13 +144,14 @@ func (ls *LivepeerServer) ImageToImage() http.Handler {
 			respondJsonError(ctx, w, err, http.StatusBadRequest)
 			return
 		}
-
+		clog.V(common.SHORT).Infof(ctx, "[Public Metrics] model_ID=%v token_ID=%v pipeline_ID=%v", *req.ModelId, token, "image-to-image")
 		clog.V(common.VERBOSE).Infof(ctx, "Received ImageToImage request imageSize=%v prompt=%v model_id=%v", req.Image.FileSize(), req.Prompt, *req.ModelId)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
+			requestToken: token,
 		}
 
 		start := time.Now()
@@ -177,6 +183,7 @@ func (ls *LivepeerServer) ImageToImage() http.Handler {
 func (ls *LivepeerServer) ImageToVideo() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -198,13 +205,14 @@ func (ls *LivepeerServer) ImageToVideo() http.Handler {
 		if prefer == "respond-async" {
 			async = true
 		}
-
+		clog.V(common.SHORT).Infof(ctx, "[Public Metrics] model_ID=%v token_ID=%v pipeline_ID=%v", *req.ModelId, token, "image-to-video")
 		clog.V(common.VERBOSE).Infof(ctx, "Received ImageToVideo request imageSize=%v model_id=%v async=%v", req.Image.FileSize(), *req.ModelId, async)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
+			requestToken: token,
 		}
 
 		if !async {
@@ -291,6 +299,7 @@ func (ls *LivepeerServer) ImageToVideo() http.Handler {
 func (ls *LivepeerServer) Upscale() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -307,12 +316,14 @@ func (ls *LivepeerServer) Upscale() http.Handler {
 			return
 		}
 
+		clog.V(common.SHORT).Infof(ctx, "[Public Metrics] model_ID=%v token_ID=%v pipeline_ID=%v", *req.ModelId, token, "upscale")
 		clog.V(common.VERBOSE).Infof(ctx, "Received Upscale request imageSize=%v prompt=%v model_id=%v", req.Image.FileSize(), req.Prompt, *req.ModelId)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
+			requestToken: token,
 		}
 
 		start := time.Now()
@@ -344,6 +355,7 @@ func (ls *LivepeerServer) Upscale() http.Handler {
 func (ls *LivepeerServer) AudioToText() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -360,12 +372,14 @@ func (ls *LivepeerServer) AudioToText() http.Handler {
 			return
 		}
 
+		clog.V(common.SHORT).Infof(ctx, "[Public Metrics] model_ID=%v token_ID=%v pipeline_ID=%v", *req.ModelId, token, "audio-to-text")
 		clog.V(common.VERBOSE).Infof(ctx, "Received AudioToText request audioSize=%v model_id=%v", req.Audio.FileSize(), *req.ModelId)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
+			requestToken: token,
 		}
 
 		start := time.Now()
@@ -397,6 +411,7 @@ func (ls *LivepeerServer) AudioToText() http.Handler {
 func (ls *LivepeerServer) SegmentAnything2() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -412,13 +427,14 @@ func (ls *LivepeerServer) SegmentAnything2() http.Handler {
 			respondJsonError(ctx, w, err, http.StatusBadRequest)
 			return
 		}
-
+		clog.V(common.SHORT).Infof(ctx, "[Public Metrics] model_ID=%v token_ID=%v pipeline_ID=%v", *req.ModelId, token, "segment-anything-2")
 		clog.V(common.VERBOSE).Infof(ctx, "Received SegmentAnything2 request; image_size=%v model_id=%v", req.Image.FileSize(), *req.ModelId)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
+			requestToken: token,
 		}
 
 		start := time.Now()
@@ -494,4 +510,22 @@ func (ls *LivepeerServer) ImageToVideoResult() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(resp)
 	})
+}
+
+func getBearerToken(r *http.Request) string {
+	// Get the Authorization header value
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "None"
+	}
+
+	// Check if the Authorization header contains "Bearer"
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "None"
+	}
+
+	// Extract the token by removing "Bearer " prefix
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	return token
 }

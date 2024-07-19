@@ -70,9 +70,10 @@ func parseBadRequestError(err error) *BadRequestError {
 }
 
 type aiRequestParams struct {
-	node        *core.LivepeerNode
-	os          drivers.OSSession
-	sessManager *AISessionManager
+	node         *core.LivepeerNode
+	os           drivers.OSSession
+	sessManager  *AISessionManager
+	requestToken string
 }
 
 // CalculateTextToImageLatencyScore computes the time taken per pixel for an text-to-image request.
@@ -195,7 +196,7 @@ func submitTextToImage(ctx context.Context, params aiRequestParams, sess *AISess
 			pricePerAIUnit = float64(priceInfo.PricePerUnit) / float64(priceInfo.PixelsPerUnit)
 		}
 
-		monitor.AIRequestFinished(ctx, "text-to-image", *req.ModelId, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
+		monitor.AIRequestFinished(ctx, "text-to-image", *req.ModelId, params.requestToken, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
 	}
 
 	return resp.JSON200, nil
@@ -335,7 +336,7 @@ func submitImageToImage(ctx context.Context, params aiRequestParams, sess *AISes
 			pricePerAIUnit = float64(priceInfo.PricePerUnit) / float64(priceInfo.PixelsPerUnit)
 		}
 
-		monitor.AIRequestFinished(ctx, "image-to-image", *req.ModelId, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
+		monitor.AIRequestFinished(ctx, "image-to-image", *req.ModelId, params.requestToken, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
 	}
 
 	return resp.JSON200, nil
@@ -476,7 +477,7 @@ func submitImageToVideo(ctx context.Context, params aiRequestParams, sess *AISes
 			pricePerAIUnit = float64(priceInfo.PricePerUnit) / float64(priceInfo.PixelsPerUnit)
 		}
 
-		monitor.AIRequestFinished(ctx, "image-to-video", *req.ModelId, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
+		monitor.AIRequestFinished(ctx, "image-to-video", *req.ModelId, params.requestToken, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
 	}
 
 	return &res, nil
@@ -601,7 +602,7 @@ func submitUpscale(ctx context.Context, params aiRequestParams, sess *AISession,
 			pricePerAIUnit = float64(priceInfo.PricePerUnit) / float64(priceInfo.PixelsPerUnit)
 		}
 
-		monitor.AIRequestFinished(ctx, "upscale", *req.ModelId, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
+		monitor.AIRequestFinished(ctx, "upscale", *req.ModelId, params.requestToken, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
 	}
 
 	return resp.JSON200, nil
@@ -699,7 +700,7 @@ func submitSegmentAnything2(ctx context.Context, params aiRequestParams, sess *A
 			pricePerAIUnit = float64(priceInfo.PricePerUnit) / float64(priceInfo.PixelsPerUnit)
 		}
 
-		monitor.AIRequestFinished(ctx, "segment anything 2", *req.ModelId, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
+		monitor.AIRequestFinished(ctx, "segment anything 2", *req.ModelId, params.requestToken, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
 	}
 
 	return resp.JSON200, nil
@@ -806,7 +807,7 @@ func submitAudioToText(ctx context.Context, params aiRequestParams, sess *AISess
 			pricePerAIUnit = float64(priceInfo.PricePerUnit) / float64(priceInfo.PixelsPerUnit)
 		}
 
-		monitor.AIRequestFinished(ctx, "audio-to-text", *req.ModelId, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
+		monitor.AIRequestFinished(ctx, "audio-to-text", *req.ModelId, params.requestToken, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
 	}
 
 	return &res, nil
