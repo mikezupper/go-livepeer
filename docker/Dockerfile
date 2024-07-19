@@ -2,7 +2,7 @@ FROM --platform=$BUILDPLATFORM livepeerci/cuda:12.0.0-cudnn8-devel-ubuntu20.04 a
 
 ARG	TARGETARCH
 ARG	BUILDARCH
-
+ENV 	BUILD_TAGS=mainnet,experimental
 ENV	GOARCH="$TARGETARCH" \
 	PATH="/usr/local/go/bin:/go/bin:${PATH}" \
 	PKG_CONFIG_PATH="/root/compiled/lib/pkgconfig" \
