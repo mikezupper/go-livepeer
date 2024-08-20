@@ -36,6 +36,8 @@ ENV	GOPATH=/go \
 
 WORKDIR	/src
 
+COPY ./ai-worker /ai-worker
+
 RUN	mkdir -p /go \
 	&& curl -fsSLO https://github.com/livepeer/livepeer-ml/releases/download/v0.3/tasmodel.pb
 
