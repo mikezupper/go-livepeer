@@ -139,6 +139,8 @@ func parseLivepeerConfig() starter.LivepeerConfig {
 	cfg.IgnoreMaxPriceIfNeeded = flag.Bool("ignoreMaxPriceIfNeeded", *cfg.IgnoreMaxPriceIfNeeded, "Set to true to allow exceeding max price condition if there is no O that meets this requirement")
 	cfg.MinPerfScore = flag.Float64("minPerfScore", *cfg.MinPerfScore, "The minimum orchestrator's performance score a broadcaster is willing to accept")
 	cfg.DiscoveryTimeout = flag.Duration("discoveryTimeout", *cfg.DiscoveryTimeout, "Time to wait for orchestrators to return info to be included in transcoding sessions for manifest (default = 500ms)")
+	cfg.AISessionTimeout = flag.Duration("aiSessionTimeout", *cfg.AISessionTimeout, "The length of time (in seconds) that an AI Session will be cached (default = 600s)")
+	cfg.WebhookRefreshInterval = flag.Duration("webhookRefreshInterval", *cfg.WebhookRefreshInterval, "The length of time (in seconds) that an Orchestrator Webhook Discovery Request will be cached (default = 60s)")
 
 	// Transcoding:
 	cfg.Orchestrator = flag.Bool("orchestrator", *cfg.Orchestrator, "Set to true to be an orchestrator")
