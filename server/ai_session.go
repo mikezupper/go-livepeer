@@ -406,19 +406,9 @@ func (c *AISessionManager) Complete(ctx context.Context, sess *AISession) error 
 func (c *AISessionManager) getSelector(ctx context.Context, cap core.Capability, modelID string) (*AISessionSelector, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	cacheKey := strconv.Itoa(int(cap)) + "_" + modelID
-	sel, ok := c.selectors[cacheKey]
-	if !ok {
-		// Create the selector
-		var err error
-		sel, err = NewAISessionSelector(cap, modelID, c.node, c.ttl)
-		if err != nil {
-			return nil, err
-		}
-
-		c.selectors[cacheKey] = sel
+	sel, err := NewAISessionSelector(cap, modelID, c.node, c.ttl)
+	if err != nil {
+		return nil, err
 	}
-
 	return sel, nil
 }

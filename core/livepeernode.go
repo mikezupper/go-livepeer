@@ -126,6 +126,7 @@ type LivepeerNode struct {
 	OrchestratorPool   common.OrchestratorPool
 	OrchPerfScore      *common.PerfScore
 	OrchSecret         string
+	AISessionTimeout   time.Duration
 	Transcoder         Transcoder
 	TranscoderManager  *RemoteTranscoderManager
 	Balances           *AddressBalances
