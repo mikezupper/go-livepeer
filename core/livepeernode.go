@@ -116,7 +116,9 @@ type LivepeerNode struct {
 	Database *common.DB
 
 	// AI worker public fields
-	AIWorker AI
+	AIWorker         AI
+	AISessionTimeout time.Duration
+	AITesterGateway  bool
 
 	// Transcoder public fields
 	SegmentChans       map[ManifestID]SegmentChan
@@ -126,12 +128,13 @@ type LivepeerNode struct {
 	OrchestratorPool   common.OrchestratorPool
 	OrchPerfScore      *common.PerfScore
 	OrchSecret         string
-	Transcoder         Transcoder
-	TranscoderManager  *RemoteTranscoderManager
-	Balances           *AddressBalances
-	Capabilities       *Capabilities
-	AutoAdjustPrice    bool
-	AutoSessionLimit   bool
+
+	Transcoder        Transcoder
+	TranscoderManager *RemoteTranscoderManager
+	Balances          *AddressBalances
+	Capabilities      *Capabilities
+	AutoAdjustPrice   bool
+	AutoSessionLimit  bool
 	// Broadcaster public fields
 	Sender pm.Sender
 
