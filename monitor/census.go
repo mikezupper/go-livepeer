@@ -117,6 +117,7 @@ type (
 		kFVErrorType                  tag.Key
 		kPipeline                     tag.Key
 		kModelName                    tag.Key
+		kRequestToken                 tag.Key
 		mSegmentSourceAppeared        *stats.Int64Measure
 		mSegmentEmerged               *stats.Int64Measure
 		mSegmentEmergedUnprocessed    *stats.Int64Measure
@@ -277,6 +278,7 @@ func InitCensus(nodeType NodeType, version string) {
 	census.kFVErrorType = tag.MustNewKey("fverror_type")
 	census.kSegClassName = tag.MustNewKey("seg_class_name")
 	census.kModelName = tag.MustNewKey("model_name")
+	census.kRequestToken = tag.MustNewKey("request_token")
 	census.kPipeline = tag.MustNewKey("pipeline")
 	census.ctx, err = tag.New(ctx, tag.Insert(census.kNodeType, string(nodeType)), tag.Insert(census.kNodeID, NodeID))
 	if err != nil {
@@ -916,7 +918,7 @@ func InitCensus(nodeType NodeType, version string) {
 			Name:        "ai_models_requested",
 			Measure:     census.mAIModelsRequested,
 			Description: "Number of AI models requested over time",
-			TagKeys:     append([]tag.Key{census.kPipeline, census.kModelName}, baseTags...),
+			TagKeys:     append([]tag.Key{census.kRequestToken, census.kPipeline, census.kModelName}, baseTags...),
 			Aggregation: view.Count(),
 		},
 		{
@@ -1848,19 +1850,19 @@ func RewardCallError(sender string) {
 }
 
 // recordModelRequested increments request count for a specific AI model and pipeline.
-func (cen *censusMetricsCounter) recordModelRequested(pipeline, modelName string) {
+func (cen *censusMetricsCounter) recordModelRequested(pipeline, modelName string, requestToken string) {
 	cen.lock.Lock()
 	defer cen.lock.Unlock()
 
 	if err := stats.RecordWithTags(cen.ctx,
-		[]tag.Mutator{tag.Insert(cen.kPipeline, pipeline), tag.Insert(cen.kModelName, modelName)}, cen.mAIModelsRequested.M(1)); err != nil {
+		[]tag.Mutator{tag.Insert(census.kRequestToken, requestToken), tag.Insert(cen.kPipeline, pipeline), tag.Insert(cen.kModelName, modelName)}, cen.mAIModelsRequested.M(1)); err != nil {
 		glog.Errorf("Failed to record metrics with tags: %v", err)
 	}
 }
 
 // AIRequestFinished records gateway AI job request metrics.
-func AIRequestFinished(ctx context.Context, pipeline string, model string, jobInfo AIJobInfo, orchInfo *lpnet.OrchestratorInfo) {
-	census.recordModelRequested(pipeline, model)
+func AIRequestFinished(ctx context.Context, pipeline string, model string, requestToken string, jobInfo AIJobInfo, orchInfo *lpnet.OrchestratorInfo) {
+	census.recordModelRequested(pipeline, model, requestToken)
 	census.recordAIRequestLatencyScore(pipeline, model, jobInfo.LatencyScore, orchInfo)
 	census.recordAIRequestPricePerUnit(pipeline, model, jobInfo.PricePerUnit)
 }
@@ -1916,8 +1918,8 @@ func AICurrentLiveSessions(currentPipelines int) {
 }
 
 // AIJobProcessed records orchestrator AI job processing metrics.
-func AIJobProcessed(ctx context.Context, pipeline string, model string, jobInfo AIJobInfo) {
-	census.recordModelRequested(pipeline, model)
+func AIJobProcessed(ctx context.Context, pipeline string, model string, requestToken string, jobInfo AIJobInfo) {
+	census.recordModelRequested(pipeline, model, requestToken)
 	census.recordAIJobLatencyScore(pipeline, model, jobInfo.LatencyScore)
 	census.recordAIJobPricePerUnit(pipeline, model, jobInfo.PricePerUnit)
 }
