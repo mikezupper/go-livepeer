@@ -62,8 +62,6 @@ const StreamKeyBytes = 6
 const SegLen = 2 * time.Second
 const BroadcastRetry = 15 * time.Second
 
-const AISessionManagerTTL = 10 * time.Minute
-
 var BroadcastJobVideoProfiles = []ffmpeg.VideoProfile{ffmpeg.P240p30fps4x3, ffmpeg.P360p30fps16x9}
 
 var AuthWebhookURL *url.URL
@@ -193,7 +191,7 @@ func NewLivepeerServer(ctx context.Context, rtmpAddr string, lpNode *core.Livepe
 		rtmpConnections:         make(map[core.ManifestID]*rtmpConnection),
 		internalManifests:       make(map[core.ManifestID]core.ManifestID),
 		recordingsAuthResponses: cache.New(time.Hour, 2*time.Hour),
-		AISessionManager:        NewAISessionManager(lpNode, AISessionManagerTTL),
+		AISessionManager:        NewAISessionManager(lpNode, lpNode.AISessionTimeout, lpNode.AITesterGateway),
 		mediaMTXApiPassword:     lpNode.MediaMTXApiPassword,
 		liveAIAuthApiKey:        lpNode.LiveAIAuthApiKey,
 		livePaymentInterval:     lpNode.LivePaymentInterval,
