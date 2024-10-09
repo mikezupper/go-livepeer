@@ -178,9 +178,9 @@ type LivepeerConfig struct {
 	LivePaymentInterval        *time.Duration
 	LiveOutSegmentTimeout      *time.Duration
 	LiveAICapRefreshModels     *string
-	WebhookRefreshInterval  *time.Duration
-	AISessionTimeout        *time.Duration
-	AITesterGateway         *bool
+	WebhookRefreshInterval     *time.Duration
+	AISessionTimeout           *time.Duration
+	AITesterGateway            *bool
 }
 
 // DefaultLivepeerConfig creates LivepeerConfig exactly the same as when no flags are passed to the livepeer process.
@@ -338,8 +338,8 @@ func DefaultLivepeerConfig() LivepeerConfig {
 		TestTranscoder:       &defaultTestTranscoder,
 
 		// AI:
-		AISessionTimeout:  &defaultAISessionTimeout,
-		AITesterGateway:   &defaultAITesterGateway,
+		AISessionTimeout:         &defaultAISessionTimeout,
+		AITesterGateway:          &defaultAITesterGateway,
 		AIServiceRegistry:        &defaultAIServiceRegistry,
 		AIWorker:                 &defaultAIWorker,
 		AIModels:                 &defaultAIModels,
@@ -1514,7 +1514,8 @@ func StartLivepeer(ctx context.Context, cfg LivepeerConfig) {
 				glog.Exit("Error setting orch webhook URL ", err)
 			}
 			glog.Info("Using orchestrator webhook URL ", whurl)
-			n.OrchestratorPool = discovery.NewWebhookPool(bcast, whurl, *cfg.DiscoveryTimeout)
+			glog.Info("Using orchestrator webhook refresh interval ", *cfg.WebhookRefreshInterval)
+			n.OrchestratorPool = discovery.NewWebhookPool(bcast, whurl, *cfg.DiscoveryTimeout, *cfg.WebhookRefreshInterval)
 		} else if len(orchURLs) > 0 {
 			n.OrchestratorPool = discovery.NewOrchestratorPool(bcast, orchURLs, common.Score_Trusted, orchBlacklist, *cfg.DiscoveryTimeout)
 		}
