@@ -96,6 +96,7 @@ func startAIMediaServer(ls *LivepeerServer) error {
 func aiMediaServerHandle[I, O any](ls *LivepeerServer, decoderFunc func(*I, *http.Request) error, processorFunc func(context.Context, aiRequestParams, I) (O, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -104,6 +105,7 @@ func aiMediaServerHandle[I, O any](ls *LivepeerServer, decoderFunc func(*I, *htt
 			node:        ls.LivepeerNode,
 			os:          drivers.NodeStorage.NewSession(requestID),
 			sessManager: ls.AISessionManager,
+			requestToken: token,
 		}
 
 		var req I
@@ -137,6 +139,7 @@ func aiMediaServerHandle[I, O any](ls *LivepeerServer, decoderFunc func(*I, *htt
 func (ls *LivepeerServer) ImageToVideo() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -165,6 +168,7 @@ func (ls *LivepeerServer) ImageToVideo() http.Handler {
 			node:        ls.LivepeerNode,
 			os:          drivers.NodeStorage.NewSession(requestID),
 			sessManager: ls.AISessionManager,
+			requestToken: token,
 		}
 
 		if !async {
@@ -251,6 +255,7 @@ func (ls *LivepeerServer) ImageToVideo() http.Handler {
 func (ls *LivepeerServer) LLM() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -273,6 +278,7 @@ func (ls *LivepeerServer) LLM() http.Handler {
 			node:        ls.LivepeerNode,
 			os:          drivers.NodeStorage.NewSession(requestID),
 			sessManager: ls.AISessionManager,
+			requestToken: token,
 		}
 
 		start := time.Now()
@@ -367,6 +373,7 @@ func (ls *LivepeerServer) StartLiveVideo() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		streamName := r.PathValue("stream")
+		token := getBearerToken(r)
 		if streamName == "" {
 			clog.Errorf(ctx, "Missing stream name")
 			http.Error(w, "Missing stream name", http.StatusBadRequest)
@@ -536,6 +543,7 @@ func (ls *LivepeerServer) StartLiveVideo() http.Handler {
 			node:        ls.LivepeerNode,
 			os:          drivers.NodeStorage.NewSession(requestID),
 			sessManager: ls.AISessionManager,
+			requestToken: token,
 
 			liveParams: liveRequestParams{
 				segmentReader:          ssr,
@@ -650,4 +658,22 @@ func (ls *LivepeerServer) cleanupLive(stream string) {
 		}
 		pub.StopControl()
 	}
+}
+
+func getBearerToken(r *http.Request) string {
+	// Get the Authorization header value
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "None"
+	}
+
+	// Check if the Authorization header contains "Bearer"
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "None"
+	}
+
+	// Extract the token by removing "Bearer " prefix
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	return token
 }
