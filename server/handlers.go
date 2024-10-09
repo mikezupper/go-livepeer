@@ -296,6 +296,23 @@ func getAvailableTranscodingOptionsHandler() http.Handler {
 	})
 }
 
+func (s *LivepeerServer) getNetworkCapabilitiesHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set Cache-Control header to cache for 60 seconds and allow stale content for 30 seconds while revalidating
+		w.Header().Set("Cache-Control", "public, max-age=120, stale-while-revalidate=60")
+		// Set Expires header to ensure older clients respect the cache duration
+		w.Header().Set("Expires", time.Now().Add(120*time.Second).Format(http.TimeFormat))
+		w.Header().Set("Vary", "Accept-Encoding")
+		networkCapsMgr, err := buildNetworkCapabilitiesManager(s.LivepeerNode)
+		if err != nil {
+			respond500(w, "failed to get network capabilities: "+err.Error())
+			return
+		}
+		respondJson(w, networkCapsMgr)
+
+	})
+}
+
 // Rounds
 func currentRoundHandler(client eth.LivepeerEthClient) http.Handler {
 	return mustHaveClient(client, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
