@@ -116,6 +116,5 @@ func (s *LivepeerServer) cliWebServerHandlers(bindAddr string) *http.ServeMux {
 	if monitor.Enabled {
 		mux.Handle("/metrics", monitor.Exporter)
 	}
-
 	return mux
 }

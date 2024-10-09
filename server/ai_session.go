@@ -479,18 +479,20 @@ func (sel *AISessionSelector) getSessions(ctx context.Context) ([]*BroadcastSess
 }
 
 type AISessionManager struct {
-	node      *core.LivepeerNode
-	selectors map[string]*AISessionSelector
-	mu        sync.Mutex
-	ttl       time.Duration
+	node                 *core.LivepeerNode
+	selectors            map[string]*AISessionSelector
+	mu                   sync.Mutex
+	ttl                  time.Duration
+	testerGatewayEnabled bool
 }
 
-func NewAISessionManager(node *core.LivepeerNode, ttl time.Duration) *AISessionManager {
+func NewAISessionManager(node *core.LivepeerNode) *AISessionManager {
 	sessionManager := &AISessionManager{
-		node:      node,
-		selectors: make(map[string]*AISessionSelector),
-		mu:        sync.Mutex{},
-		ttl:       ttl,
+		node:                 node,
+		selectors:            make(map[string]*AISessionSelector),
+		mu:                   sync.Mutex{},
+		ttl:                  node.AISessionTimeout,
+		testerGatewayEnabled: node.AITesterGateway,
 	}
 	return sessionManager
 }
@@ -541,21 +543,28 @@ func (c *AISessionManager) Complete(ctx context.Context, sess *AISession) error 
 func (c *AISessionManager) getSelector(ctx context.Context, cap core.Capability, modelID string) (*AISessionSelector, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	cacheKey := strconv.Itoa(int(cap)) + "_" + modelID
-	sel, ok := c.selectors[cacheKey]
-	if !ok {
-		// Create the selector
-		var err error
-		sel, err = NewAISessionSelector(ctx, cap, modelID, c.node, c.ttl)
+	if c.testerGatewayEnabled {
+		sel, err := NewAISessionSelector(ctx, cap, modelID, c.node, c.ttl)
 		if err != nil {
 			return nil, err
 		}
+		return sel, nil
+	} else {
+		cacheKey := strconv.Itoa(int(cap)) + "_" + modelID
+		sel, ok := c.selectors[cacheKey]
+		if !ok {
+			// Create the selector
+			var err error
+			sel, err = NewAISessionSelector(ctx, cap, modelID, c.node, c.ttl)
+			if err != nil {
+				return nil, err
+			}
 
-		c.selectors[cacheKey] = sel
+			c.selectors[cacheKey] = sel
+		}
+
+		return sel, nil
 	}
-
-	return sel, nil
 }
 
 func (s *AISession) Clone() *AISession {
