@@ -53,7 +53,7 @@ func startAIServer(lp lphttp) error {
 func (h *lphttp) TextToImage() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orch := h.orchestrator
-
+		token := getBearerToken(r)
 		remoteAddr := getRemoteAddr(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 
@@ -63,14 +63,14 @@ func (h *lphttp) TextToImage() http.Handler {
 			return
 		}
 
-		handleAIRequest(ctx, w, r, orch, req)
+		handleAIRequest(ctx, w, r, token, orch, req)
 	})
 }
 
 func (h *lphttp) ImageToImage() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orch := h.orchestrator
-
+		token := getBearerToken(r)
 		remoteAddr := getRemoteAddr(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 
@@ -86,14 +86,14 @@ func (h *lphttp) ImageToImage() http.Handler {
 			return
 		}
 
-		handleAIRequest(ctx, w, r, orch, req)
+		handleAIRequest(ctx, w, r, token, orch, req)
 	})
 }
 
 func (h *lphttp) ImageToVideo() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orch := h.orchestrator
-
+		token := getBearerToken(r)
 		remoteAddr := getRemoteAddr(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 
@@ -109,14 +109,14 @@ func (h *lphttp) ImageToVideo() http.Handler {
 			return
 		}
 
-		handleAIRequest(ctx, w, r, orch, req)
+		handleAIRequest(ctx, w, r, token, orch, req)
 	})
 }
 
 func (h *lphttp) Upscale() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orch := h.orchestrator
-
+		token := getBearerToken(r)
 		remoteAddr := getRemoteAddr(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 
@@ -132,14 +132,14 @@ func (h *lphttp) Upscale() http.Handler {
 			return
 		}
 
-		handleAIRequest(ctx, w, r, orch, req)
+		handleAIRequest(ctx, w, r, token, orch, req)
 	})
 }
 
 func (h *lphttp) AudioToText() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orch := h.orchestrator
-
+		token := getBearerToken(r)
 		remoteAddr := getRemoteAddr(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 
@@ -155,14 +155,14 @@ func (h *lphttp) AudioToText() http.Handler {
 			return
 		}
 
-		handleAIRequest(ctx, w, r, orch, req)
+		handleAIRequest(ctx, w, r, token, orch, req)
 	})
 }
 
 func (h *lphttp) SegmentAnything2() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orch := h.orchestrator
-
+		token := getBearerToken(r)
 		remoteAddr := getRemoteAddr(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 
@@ -178,14 +178,14 @@ func (h *lphttp) SegmentAnything2() http.Handler {
 			return
 		}
 
-		handleAIRequest(ctx, w, r, orch, req)
+		handleAIRequest(ctx, w, r, token, orch, req)
 	})
 }
 
 func (h *lphttp) LLM() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orch := h.orchestrator
-
+		token := getBearerToken(r)
 		remoteAddr := getRemoteAddr(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 
@@ -201,11 +201,12 @@ func (h *lphttp) LLM() http.Handler {
 			return
 		}
 
-		handleAIRequest(ctx, w, r, orch, req)
+		handleAIRequest(ctx, w, r, token, orch, req)
 	})
 }
 
-func handleAIRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, orch Orchestrator, req interface{}) {
+func handleAIRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, token string, orch Orchestrator, req interface{}) {
+
 	payment, err := getPayment(r.Header.Get(paymentHeader))
 	if err != nil {
 		respondWithError(w, err.Error(), http.StatusPaymentRequired)
@@ -443,7 +444,7 @@ func handleAIRequest(ctx context.Context, w http.ResponseWriter, r *http.Request
 			pricePerAIUnit = float64(priceInfo.GetPricePerUnit()) / float64(priceInfo.GetPixelsPerUnit())
 		}
 
-		monitor.AIJobProcessed(ctx, pipeline, modelID, monitor.AIJobInfo{LatencyScore: latencyScore, PricePerUnit: pricePerAIUnit})
+		monitor.AIJobProcessed(ctx, pipeline, modelID, token, monitor.AIJobInfo{LatencyScore: latencyScore, PricePerUnit: pricePerAIUnit})
 	}
 
 	// Check if the response is a streaming response
