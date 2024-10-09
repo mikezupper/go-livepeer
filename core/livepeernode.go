@@ -121,6 +121,8 @@ type LivepeerNode struct {
 	// AI worker public fields
 	AIWorker        AI
 	AIWorkerManager *RemoteAIWorkerManager
+	AISessionTimeout time.Duration
+	AITesterGateway  bool
 
 	// Transcoder public fields
 	SegmentChans       map[ManifestID]SegmentChan
