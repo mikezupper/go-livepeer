@@ -67,9 +67,11 @@ func startAIServer(lp lphttp) error {
 	lp.transRPC.Handle("/upscale", oapiReqValidator(aiHttpHandle(&lp, multipartDecoder[worker.GenUpscaleMultipartRequestBody])))
 	lp.transRPC.Handle("/audio-to-text", oapiReqValidator(aiHttpHandle(&lp, multipartDecoder[worker.GenAudioToTextMultipartRequestBody])))
 	lp.transRPC.Handle("/llm", oapiReqValidator(aiHttpHandle(&lp, multipartDecoder[worker.GenLLMFormdataRequestBody])))
+	//lp.transRPC.Handle("/llm", oapiReqValidator(aiHttpHandle(&lp, jsonDecoder[worker.GenLLMFormdataRequestBody])))
 	lp.transRPC.Handle("/segment-anything-2", oapiReqValidator(aiHttpHandle(&lp, multipartDecoder[worker.GenSegmentAnything2MultipartRequestBody])))
 	lp.transRPC.Handle("/image-to-text", oapiReqValidator(aiHttpHandle(&lp, multipartDecoder[worker.GenImageToTextMultipartRequestBody])))
 	lp.transRPC.Handle("/text-to-speech", oapiReqValidator(aiHttpHandle(&lp, jsonDecoder[worker.GenTextToSpeechJSONRequestBody])))
+	//lp.transRPC.Handle("/text-to-speech", oapiReqValidator(aiHttpHandle(&lp, multipartDecoder[worker.GenTextToSpeechJSONRequestBody])))
 	lp.transRPC.Handle("/live-video-to-video", oapiReqValidator(lp.StartLiveVideoToVideo()))
 	// Additionally, there is the '/aiResults' endpoint registered in server/rpc.go
 
@@ -80,6 +82,7 @@ func startAIServer(lp lphttp) error {
 func aiHttpHandle[I any](h *lphttp, decoderFunc func(*I, *http.Request) error) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orch := h.orchestrator
+		token := getBearerToken(r)
 		remoteAddr := getRemoteAddr(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 
@@ -89,7 +92,7 @@ func aiHttpHandle[I any](h *lphttp, decoderFunc func(*I, *http.Request) error) h
 			return
 		}
 
-		handleAIRequest(ctx, w, r, orch, req)
+		handleAIRequest(ctx, w, r, token, orch, req)
 	})
 }
 
@@ -211,7 +214,7 @@ func overwriteHost(hostOverwrite, url string) string {
 	return u.String()
 }
 
-func handleAIRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, orch Orchestrator, req interface{}) {
+func handleAIRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, token string, orch Orchestrator, req interface{}) {
 	payment, err := getPayment(r.Header.Get(paymentHeader))
 	if err != nil {
 		respondWithError(w, err.Error(), http.StatusPaymentRequired)
@@ -514,7 +517,7 @@ func handleAIRequest(ctx context.Context, w http.ResponseWriter, r *http.Request
 			pricePerAIUnit = float64(priceInfo.GetPricePerUnit()) / float64(priceInfo.GetPixelsPerUnit())
 		}
 
-		monitor.AIJobProcessed(ctx, pipeline, modelID, monitor.AIJobInfo{LatencyScore: latencyScore, PricePerUnit: pricePerAIUnit})
+		monitor.AIJobProcessed(ctx, pipeline, modelID, token, monitor.AIJobInfo{LatencyScore: latencyScore, PricePerUnit: pricePerAIUnit})
 	}
 
 	// Check if the response is a streaming response
