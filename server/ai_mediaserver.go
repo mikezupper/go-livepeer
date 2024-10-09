@@ -134,6 +134,7 @@ func generateWhepUrl(streamName, requestID string) string {
 func aiMediaServerHandle[I, O any](ls *LivepeerServer, decoderFunc func(*I, *http.Request) error, processorFunc func(context.Context, aiRequestParams, I) (O, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -142,6 +143,7 @@ func aiMediaServerHandle[I, O any](ls *LivepeerServer, decoderFunc func(*I, *htt
 			node:        ls.LivepeerNode,
 			os:          drivers.NodeStorage.NewSession(requestID),
 			sessManager: ls.AISessionManager,
+			requestToken: token,
 		}
 
 		var req I
@@ -175,6 +177,7 @@ func aiMediaServerHandle[I, O any](ls *LivepeerServer, decoderFunc func(*I, *htt
 func (ls *LivepeerServer) ImageToVideo() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -200,9 +203,10 @@ func (ls *LivepeerServer) ImageToVideo() http.Handler {
 		clog.V(common.VERBOSE).Infof(ctx, "Received ImageToVideo request imageSize=%v model_id=%v async=%v", req.Image.FileSize(), *req.ModelId, async)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
+			requestToken: token,
 		}
 
 		if !async {
@@ -289,6 +293,7 @@ func (ls *LivepeerServer) ImageToVideo() http.Handler {
 func (ls *LivepeerServer) LLM() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		remoteAddr := getRemoteAddr(r)
+		token := getBearerToken(r)
 		ctx := clog.AddVal(r.Context(), clog.ClientIP, remoteAddr)
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
@@ -305,12 +310,13 @@ func (ls *LivepeerServer) LLM() http.Handler {
 			return
 		}
 
-		clog.V(common.VERBOSE).Infof(ctx, "Received LLM request model_id=%v stream=%v", *req.Model, *req.Stream)
+		clog.V(common.VERBOSE).Infof(ctx, "Received LLM request model_id=%v", *req.Model)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
+			requestToken: token,
 		}
 
 		start := time.Now()
@@ -416,6 +422,7 @@ func (ls *LivepeerServer) StartLiveVideo() http.Handler {
 
 		requestID := string(core.RandomManifestID())
 		ctx = clog.AddVal(ctx, "request_id", requestID)
+		token := getBearerToken(r)
 
 		streamName := r.PathValue("stream")
 		if streamName == "" {
@@ -615,6 +622,7 @@ func (ls *LivepeerServer) StartLiveVideo() http.Handler {
 
 		ssr := media.NewSwitchableSegmentReader()
 		params := aiRequestParams{
+			requestToken: token,
 			node:        ls.LivepeerNode,
 			os:          drivers.NodeStorage.NewSession(requestID),
 			sessManager: ls.AISessionManager,
@@ -1386,4 +1394,23 @@ func sendHeartbeat(ctx context.Context, node *core.LivepeerNode, liveAIHeartbeat
 		clog.Errorf(ctx, "heartbeat: response body: %s", string(body))
 		return
 	}
+}
+
+
+func getBearerToken(r *http.Request) string {
+	// Get the Authorization header value
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "None"
+	}
+
+	// Check if the Authorization header contains "Bearer"
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "None"
+	}
+
+	// Extract the token by removing "Bearer " prefix
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	return token
 }

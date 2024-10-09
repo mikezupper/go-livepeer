@@ -535,10 +535,10 @@ type AISessionManager struct {
 
 func NewAISessionManager(node *core.LivepeerNode, ttl time.Duration, testerGatewayEnabled bool) *AISessionManager {
 	sessionManager := &AISessionManager{
-		node:      node,
-		selectors: make(map[string]*AISessionSelector),
-		mu:        sync.Mutex{},
-		ttl:       ttl,
+		node:                 node,
+		selectors:            make(map[string]*AISessionSelector),
+		mu:                   sync.Mutex{},
+		ttl:                  ttl,
 		testerGatewayEnabled: testerGatewayEnabled,
 	}
 	sessionManager.refreshOrchCapacity(node.LiveAICapRefreshModels)
@@ -613,8 +613,6 @@ func (c *AISessionManager) getSelector(ctx context.Context, cap core.Capability,
 		}
 
 		return sel, nil
-
-		}
 	}
 }
 
