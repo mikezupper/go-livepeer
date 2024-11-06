@@ -92,9 +92,9 @@ func aiMediaServerHandle[I, O any](ls *LivepeerServer, decoderFunc func(*I, *htt
 		ctx = clog.AddVal(ctx, "request_id", requestID)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
 			requestToken: token,
 		}
 
@@ -155,9 +155,9 @@ func (ls *LivepeerServer) ImageToVideo() http.Handler {
 		clog.V(common.VERBOSE).Infof(ctx, "Received ImageToVideo request imageSize=%v model_id=%v async=%v", req.Image.FileSize(), *req.ModelId, async)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
 			requestToken: token,
 		}
 
@@ -263,12 +263,12 @@ func (ls *LivepeerServer) LLM() http.Handler {
 			return
 		}
 
-		clog.V(common.VERBOSE).Infof(ctx, "Received LLM request prompt=%v model_id=%v stream=%v", req.Prompt, *req.ModelId, *req.Stream)
+		clog.V(common.VERBOSE).Infof(ctx, "Received LLM request prompt=%v model_id=%v stream=%v", req.Prompt, *req.ModelId)
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:         ls.LivepeerNode,
+			os:           drivers.NodeStorage.NewSession(requestID),
+			sessManager:  ls.AISessionManager,
 			requestToken: token,
 		}
 
@@ -381,11 +381,11 @@ func (ls *LivepeerServer) StartLiveVideo() http.Handler {
 		}()
 
 		params := aiRequestParams{
-			node:        ls.LivepeerNode,
-			os:          drivers.NodeStorage.NewSession(requestID),
-			sessManager: ls.AISessionManager,
+			node:          ls.LivepeerNode,
+			os:            drivers.NodeStorage.NewSession(requestID),
+			sessManager:   ls.AISessionManager,
 			segmentReader: ssr,
-			requestToken: token,
+			requestToken:  token,
 		}
 
 		req := worker.GenLiveVideoToVideoJSONRequestBody{
