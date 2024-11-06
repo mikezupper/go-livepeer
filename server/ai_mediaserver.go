@@ -271,7 +271,7 @@ func (ls *LivepeerServer) LLM() http.Handler {
 			return
 		}
 
-		clog.V(common.VERBOSE).Infof(ctx, "Received LLM request model_id=%v stream=%v", *req.Model, *req.Stream)
+		clog.V(common.VERBOSE).Infof(ctx, "Received LLM request model_id=%v", *req.Model)
 
 		params := aiRequestParams{
 			node:        ls.LivepeerNode,
