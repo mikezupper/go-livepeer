@@ -1228,7 +1228,7 @@ func handleNonStreamingResponse(ctx context.Context, body io.ReadCloser, sess *A
 	}
 
 	took := time.Since(start)
-	sess.LatencyScore = CalculateLLMLatencyScore(took, res.TokensUsed)
+	sess.LatencyScore = CalculateLLMLatencyScore(took, res.TokensUsed.TotalTokens)
 
 	if monitor.Enabled {
 		var pricePerAIUnit float64
