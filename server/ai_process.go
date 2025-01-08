@@ -81,9 +81,9 @@ func parseBadRequestError(err error) *BadRequestError {
 }
 
 type aiRequestParams struct {
-	node        *core.LivepeerNode
-	os          drivers.OSSession
-	sessManager *AISessionManager
+	node         *core.LivepeerNode
+	os           drivers.OSSession
+	sessManager  *AISessionManager
 	requestToken string
 
 	liveParams liveRequestParams
@@ -1181,8 +1181,8 @@ func submitLLM(ctx context.Context, params aiRequestParams, sess *AISession, req
 	return handleNonStreamingResponse(ctx, params.requestToken, resp.Body, sess, req, start)
 }
 
-func handleSSEStream(ctx context.Context, token string, body io.ReadCloser, sess *AISession, req worker.GenLLMJSONRequestBody, start time.Time) (chan worker.LlmStreamChunk, error) {
-	streamChan := make(chan worker.LlmStreamChunk, 100)
+func handleSSEStream(ctx context.Context, token string, body io.ReadCloser, sess *AISession, req worker.GenLLMJSONRequestBody, start time.Time) (chan *worker.LLMResponse, error) {
+	streamChan := make(chan *worker.LLMResponse, 100)
 	go func() {
 		defer close(streamChan)
 		defer body.Close()
@@ -1251,7 +1251,7 @@ func handleNonStreamingResponse(ctx context.Context, token string, body io.ReadC
 		if priceInfo := sess.OrchestratorInfo.GetPriceInfo(); priceInfo != nil && priceInfo.PixelsPerUnit != 0 {
 			pricePerAIUnit = float64(priceInfo.PricePerUnit) / float64(priceInfo.PixelsPerUnit)
 		}
-		monitor.AIRequestFinished(ctx, "llm", *req.Model, token,monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
+		monitor.AIRequestFinished(ctx, "llm", *req.Model, token, monitor.AIJobInfo{LatencyScore: sess.LatencyScore, PricePerUnit: pricePerAIUnit}, sess.OrchestratorInfo)
 	}
 
 	return &res, nil
