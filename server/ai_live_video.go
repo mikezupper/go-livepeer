@@ -20,7 +20,10 @@ import (
 	"github.com/livepeer/go-livepeer/media"
 	"github.com/livepeer/go-livepeer/monitor"
 	"github.com/livepeer/go-livepeer/trickle"
+
 	"github.com/livepeer/lpms/ffmpeg"
+
+	"github.com/dustin/go-humanize"
 )
 
 func startTricklePublish(ctx context.Context, url *url.URL, params aiRequestParams, sess *AISession) {
@@ -121,7 +124,7 @@ func startTricklePublish(ctx context.Context, url *url.URL, params aiRequestPara
 	clog.Infof(ctx, "trickle pub")
 }
 
-func startTrickleSubscribe(ctx context.Context, url *url.URL, params aiRequestParams) {
+func startTrickleSubscribe(ctx context.Context, url *url.URL, params aiRequestParams, onFistSegment func()) {
 	// subscribe to the outputs and send them into LPMS
 	subscriber := trickle.NewTrickleSubscriber(url.String())
 	r, w, err := os.Pipe()
@@ -135,6 +138,8 @@ func startTrickleSubscribe(ctx context.Context, url *url.URL, params aiRequestPa
 	// read segments from trickle subscription
 	go func() {
 		var err error
+		firstSegment := true
+
 		defer w.Close()
 		retries := 0
 		// we're trying to keep (retryPause x maxRetries) duration to fall within one output GOP length
@@ -146,7 +151,7 @@ func startTrickleSubscribe(ctx context.Context, url *url.URL, params aiRequestPa
 				break
 			}
 			var segment *http.Response
-			clog.V(8).Infof(ctx, "trickle subscribe read data begin")
+			clog.V(8).Infof(ctx, "trickle subscribe read data await")
 			segment, err = subscriber.Read()
 			if err != nil {
 				if errors.Is(err, trickle.EOS) || errors.Is(err, trickle.StreamNotFoundErr) {
@@ -171,17 +176,35 @@ func startTrickleSubscribe(ctx context.Context, url *url.URL, params aiRequestPa
 				continue
 			}
 			retries = 0
-			clog.V(8).Infof(ctx, "trickle subscribe read data end")
+			seq := trickle.GetSeq(segment)
+			clog.V(8).Infof(ctx, "trickle subscribe read data received seq=%d", seq)
 
-			if err = copySegment(segment, w); err != nil {
+			n, err := copySegment(segment, w)
+			if err != nil {
 				params.liveParams.stopPipeline(fmt.Errorf("trickle subscribe error copying: %w", err))
 				return
 			}
+			if firstSegment {
+				firstSegment = false
+				onFistSegment()
+			}
+			clog.V(8).Infof(ctx, "trickle subscribe read data completed seq=%d bytes=%s", seq, humanize.Bytes(uint64(n)))
 		}
 	}()
 
 	go func() {
-		defer r.Close()
+		defer func() {
+			r.Close()
+			if rec := recover(); rec != nil {
+				// panicked, so shut down the stream and handle it
+				err, ok := rec.(error)
+				if !ok {
+					err = errors.New("unknown error")
+				}
+				clog.Errorf(ctx, "LPMS panic err=%v", err)
+				params.liveParams.stopPipeline(fmt.Errorf("LPMS panic %w", err))
+			}
+		}()
 		for {
 			if !params.inputStreamExists() {
 				clog.Errorf(ctx, "Stopping output rtmp stream, input stream does not exist.")
@@ -204,10 +227,9 @@ func startTrickleSubscribe(ctx context.Context, url *url.URL, params aiRequestPa
 	}()
 }
 
-func copySegment(segment *http.Response, w io.Writer) error {
+func copySegment(segment *http.Response, w io.Writer) (int64, error) {
 	defer segment.Body.Close()
-	_, err := io.Copy(w, segment.Body)
-	return err
+	return io.Copy(w, segment.Body)
 }
 
 func startControlPublish(control *url.URL, params aiRequestParams) {
@@ -264,12 +286,35 @@ func startEventsSubscribe(ctx context.Context, url *url.URL, params aiRequestPar
 
 	go func() {
 		defer StreamStatusStore.Clear(streamId)
+		const maxRetries = 5
+		const retryPause = 300 * time.Millisecond
+		retries := 0
 		for {
 			clog.Infof(ctx, "Reading from event subscription for URL: %s", url.String())
 			segment, err := subscriber.Read()
-			if err != nil {
-				clog.Infof(ctx, "Error reading events subscription: %s", err)
-				return
+			if err == nil {
+				retries = 0
+			} else {
+				// handle errors from event read
+				if errors.Is(err, trickle.EOS) || errors.Is(err, trickle.StreamNotFoundErr) {
+					clog.Infof(ctx, "Stopping subscription due to %s", err)
+					return
+				}
+				var seqErr *trickle.SequenceNonexistent
+				if errors.As(err, &seqErr) {
+					// stream exists but segment doesn't, so skip to leading edge
+					subscriber.SetSeq(seqErr.Latest)
+				}
+				if retries > maxRetries {
+					clog.Infof(ctx, "Too many errors reading events; stopping subscription err=%v", err)
+					err = fmt.Errorf("Error reading subscription: %w", err)
+					params.liveParams.stopPipeline(err)
+					return
+				}
+				clog.Infof(ctx, "Error reading events subscription: err=%v retry=%d", err, retries)
+				retries++
+				time.Sleep(retryPause)
+				continue
 			}
 
 			body, err := io.ReadAll(segment.Body)
