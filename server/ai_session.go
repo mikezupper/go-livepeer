@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -221,7 +222,7 @@ func NewAISessionSelector(ctx context.Context, cap core.Capability, modelID stri
 	penalty := 3
 	var warmSel, coldSel BroadcastSessionsSelector
 	var autoClear bool
-	if cap == core.Capability_LiveVideoToVideo {
+	if cap == core.Capability_LiveVideoToVideo || os.Getenv("LIVEPEER_TESTER_GATEWAY_ENABLED") == "true" {
 		// For Realtime Video AI, we use a dedicated selection algorithm
 		selAlg := LiveSelectionAlgorithm{}
 		warmSel = NewSelector(stakeRdr, selAlg, node.OrchPerfScore, warmCaps)
@@ -257,7 +258,7 @@ func NewAISessionSelector(ctx context.Context, cap core.Capability, modelID stri
 
 	// Periodically refresh sessions for Live Video to Video in order to minimize the necessity of refreshing sessions
 	// when the AI process is started
-	if cap == core.Capability_LiveVideoToVideo {
+	if cap == core.Capability_LiveVideoToVideo || os.Getenv("LIVEPEER_TESTER_GATEWAY_ENABLED") == "true" {
 		startPeriodicRefresh(sel)
 	}
 
@@ -319,7 +320,7 @@ func (sel *AISessionSelector) Select(ctx context.Context) *AISession {
 		if sel.SelectorIsEmpty() {
 			clog.Infof(ctx, "refreshing sessions, no orchestrators in pools")
 			penalty := sel.penalty
-			if sel.cap == core.Capability_LiveVideoToVideo {
+			if sel.cap == core.Capability_LiveVideoToVideo || os.Getenv("LIVEPEER_TESTER_GATEWAY_ENABLED") == "true" {
 				// For AI Live Video to Video, we don't store penalty in the selector
 				penalty = aiLiveVideoToVideoPenalty
 			}
@@ -328,7 +329,7 @@ func (sel *AISessionSelector) Select(ctx context.Context) *AISession {
 			}
 		}
 
-		if sel.cap == core.Capability_LiveVideoToVideo {
+		if sel.cap == core.Capability_LiveVideoToVideo || os.Getenv("LIVEPEER_TESTER_GATEWAY_ENABLED") == "true" {
 			return sel.SelectorIsEmpty()
 		}
 
@@ -479,20 +480,18 @@ func (sel *AISessionSelector) getSessions(ctx context.Context) ([]*BroadcastSess
 }
 
 type AISessionManager struct {
-	node                 *core.LivepeerNode
-	selectors            map[string]*AISessionSelector
-	mu                   sync.Mutex
-	ttl                  time.Duration
-	testerGatewayEnabled bool
+	node      *core.LivepeerNode
+	selectors map[string]*AISessionSelector
+	mu        sync.Mutex
+	ttl       time.Duration
 }
 
-func NewAISessionManager(node *core.LivepeerNode) *AISessionManager {
+func NewAISessionManager(node *core.LivepeerNode, ttl time.Duration) *AISessionManager {
 	sessionManager := &AISessionManager{
-		node:                 node,
-		selectors:            make(map[string]*AISessionSelector),
-		mu:                   sync.Mutex{},
-		ttl:                  node.AISessionTimeout,
-		testerGatewayEnabled: node.AITesterGateway,
+		node:      node,
+		selectors: make(map[string]*AISessionSelector),
+		mu:        sync.Mutex{},
+		ttl:       ttl,
 	}
 	return sessionManager
 }
@@ -543,28 +542,19 @@ func (c *AISessionManager) Complete(ctx context.Context, sess *AISession) error 
 func (c *AISessionManager) getSelector(ctx context.Context, cap core.Capability, modelID string) (*AISessionSelector, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.testerGatewayEnabled {
-		sel, err := NewAISessionSelector(ctx, cap, modelID, c.node, c.ttl)
+
+	cacheKey := strconv.Itoa(int(cap)) + "_" + modelID
+	sel, ok := c.selectors[cacheKey]
+	if !ok {
+		// Create the selector
+		var err error
+		sel, err = NewAISessionSelector(ctx, cap, modelID, c.node, c.ttl)
 		if err != nil {
 			return nil, err
 		}
-		return sel, nil
-	} else {
-		cacheKey := strconv.Itoa(int(cap)) + "_" + modelID
-		sel, ok := c.selectors[cacheKey]
-		if !ok {
-			// Create the selector
-			var err error
-			sel, err = NewAISessionSelector(ctx, cap, modelID, c.node, c.ttl)
-			if err != nil {
-				return nil, err
-			}
-
-			c.selectors[cacheKey] = sel
-		}
-
-		return sel, nil
+		c.selectors[cacheKey] = sel
 	}
+	return sel, nil
 }
 
 func (s *AISession) Clone() *AISession {

@@ -36,9 +36,6 @@ func NewLivepeerConfig(fs *flag.FlagSet) LivepeerConfig {
 	cfg.IgnoreMaxPriceIfNeeded = fs.Bool("ignoreMaxPriceIfNeeded", *cfg.IgnoreMaxPriceIfNeeded, "Set to true to allow exceeding max price condition if there is no O that meets this requirement")
 	cfg.MinPerfScore = fs.Float64("minPerfScore", *cfg.MinPerfScore, "The minimum orchestrator's performance score a gateway is willing to accept")
 	cfg.DiscoveryTimeout = fs.Duration("discoveryTimeout", *cfg.DiscoveryTimeout, "Time to wait for orchestrators to return info to be included in transcoding sessions for manifest (default = 500ms)")
-	cfg.AISessionTimeout = flag.Duration("aiSessionTimeout", *cfg.AISessionTimeout, "The length of time (in seconds) that an AI Session will be cached (default = 600s)")
-	cfg.WebhookRefreshInterval = flag.Duration("webhookRefreshInterval", *cfg.WebhookRefreshInterval, "The length of time (in seconds) that an Orchestrator Webhook Discovery Request will be cached (default = 60s)")
-	cfg.AITesterGateway = flag.Bool("aiTesterGateway", *cfg.AITesterGateway, "Set to true to allow the gateway to run in \"tester\" mode. This will bypass caching of AI session selectors.")
 	cfg.GatewayHost = fs.String("gatewayHost", *cfg.GatewayHost, "External hostname on which the Gateway node is running. Used when telling external services how to reach the node.")
 
 	// Transcoding:

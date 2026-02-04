@@ -164,12 +164,9 @@ type LivepeerConfig struct {
 	LiveAIAuthWebhookURL       *string
 	LiveAITrickleHostForRunner *string
 	OrchWebhookURL             *string
-	WebhookRefreshInterval     *time.Duration
 	OrchBlacklist              *string
 	OrchMinLivepeerVersion     *string
 	TestOrchAvail              *bool
-	AISessionTimeout           *time.Duration
-	AITesterGateway            *bool
 	RemoteSigner               *bool
 	RemoteSignerUrl            *string
 	AIRunnerImage              *string
@@ -232,9 +229,6 @@ func DefaultLivepeerConfig() LivepeerConfig {
 	defaultTestTranscoder := true
 
 	// AI:
-	defaultAISessionTimeout := 10 * time.Minute
-	defaultWebhookRefreshInterval := 1 * time.Minute
-	defaultAITesterGateway := false
 	defaultAIServiceRegistry := false
 	defaultAIWorker := false
 	defaultAIModels := ""
@@ -356,8 +350,6 @@ func DefaultLivepeerConfig() LivepeerConfig {
 		TestTranscoder:       &defaultTestTranscoder,
 
 		// AI:
-		AISessionTimeout:         &defaultAISessionTimeout,
-		AITesterGateway:          &defaultAITesterGateway,
 		AIServiceRegistry:        &defaultAIServiceRegistry,
 		AIWorker:                 &defaultAIWorker,
 		AIModels:                 &defaultAIModels,
@@ -427,7 +419,6 @@ func DefaultLivepeerConfig() LivepeerConfig {
 		FVfailGsKey:    &defaultFVfailGsKey,
 
 		// API
-		WebhookRefreshInterval: &defaultWebhookRefreshInterval,
 		AuthWebhookURL: &defaultAuthWebhookURL,
 		OrchWebhookURL: &defaultOrchWebhookURL,
 
@@ -1200,8 +1191,6 @@ func StartLivepeer(ctx context.Context, cfg LivepeerConfig) {
 					server.BroadcastCfg.SetCapabilityMaxPrice(cap, p.ModelID, autoCapPrice)
 				}
 			}
-			n.AITesterGateway = *cfg.AITesterGateway
-			n.AISessionTimeout = *cfg.AISessionTimeout
 		}
 
 		if n.NodeType == core.RedeemerNode {
@@ -1643,7 +1632,7 @@ func StartLivepeer(ctx context.Context, cfg LivepeerConfig) {
 				glog.Exit("Error setting orch webhook URL ", err)
 			}
 			glog.Info("Using orchestrator webhook URL ", whurl)
-			n.OrchestratorPool = discovery.NewWebhookPool(bcast, whurl, *cfg.DiscoveryTimeout, *cfg.WebhookRefreshInterval)
+			n.OrchestratorPool = discovery.NewWebhookPool(bcast, whurl, *cfg.DiscoveryTimeout)
 		} else if len(orchURLs) > 0 {
 			n.OrchestratorPool = discovery.NewOrchestratorPool(bcast, orchURLs, common.Score_Trusted, orchBlacklist, *cfg.DiscoveryTimeout)
 		}

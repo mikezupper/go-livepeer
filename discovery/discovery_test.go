@@ -1125,7 +1125,7 @@ func TestNewWHOrchestratorPoolCache(t *testing.T) {
 
 	// assert created webhook pool is correct length
 	whURL, _ := url.ParseRequestURI("https://livepeer.live/api/orchestrator")
-	whpool := NewWebhookPool(&stubBroadcaster{}, whURL, 500*time.Millisecond, 1*time.Minute)
+	whpool := NewWebhookPool(&stubBroadcaster{}, whURL, 500*time.Millisecond)
 	assert.Equal(3, whpool.Size())
 
 	// assert that list is not refreshed if lastRequest is less than 1 min ago and hash is the same
