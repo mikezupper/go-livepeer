@@ -243,7 +243,7 @@ func (bso *BYOCOrchestratorServer) monitorOrchStream(job *orchJob) {
 			return
 		case <-pmtTicker.C:
 			// Check payment status
-			extCap, ok := bso.node.ExternalCapabilities.Capabilities[capability]
+			extCap, ok := bso.node.ExternalCapabilities.GetCapability(capability)
 			if !ok {
 				clog.Errorf(ctx, "Capability not found for payment monitoring, exiting monitoring capability=%s", capability)
 				return

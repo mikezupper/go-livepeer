@@ -170,10 +170,11 @@ type NetworkCapabilities struct {
 	Orchestrators []*OrchNetworkCapabilities `json:"orchestrators"`
 }
 type OrchNetworkCapabilities struct {
-	Address            string                     `json:"address"`
-	LocalAddress       string                     `json:"local_address"`
-	OrchURI            string                     `json:"orch_uri"`
-	Capabilities       *net.Capabilities          `json:"capabilities"`
-	CapabilitiesPrices []*net.PriceInfo           `json:"capabilities_prices"`
-	Hardware           []*net.HardwareInformation `json:"hardware"`
+	Address            string                              `json:"address"`
+	LocalAddress       string                              `json:"local_address"`
+	OrchURI            string                              `json:"orch_uri"`
+	Capabilities       *net.Capabilities                   `json:"capabilities"`
+	CapabilitiesPrices []*net.PriceInfo                    `json:"capabilities_prices"`
+	Hardware           []*net.HardwareInformation          `json:"hardware"`
+	CapabilityOptions  map[string][]map[string]interface{} `json:"capability_options,omitempty"`
 }
