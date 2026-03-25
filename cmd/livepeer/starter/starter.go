@@ -179,6 +179,7 @@ type LivepeerConfig struct {
 	KafkaUsername              *string
 	KafkaPassword              *string
 	KafkaGatewayTopic          *string
+	KafkaSASLMechanism         *string
 	MediaMTXApiPassword        *string
 	LiveAIAuthApiKey           *string
 	LiveAIHeartbeatURL         *string
@@ -312,6 +313,7 @@ func DefaultLivepeerConfig() LivepeerConfig {
 	defaultKafkaUsername := ""
 	defaultKafkaPassword := ""
 	defaultKafkaGatewayTopic := ""
+	defaultKafkaSASLMechanism := "plain"
 
 	return LivepeerConfig{
 		// Network & Addresses:
@@ -435,6 +437,7 @@ func DefaultLivepeerConfig() LivepeerConfig {
 		KafkaUsername:         &defaultKafkaUsername,
 		KafkaPassword:         &defaultKafkaPassword,
 		KafkaGatewayTopic:     &defaultKafkaGatewayTopic,
+		KafkaSASLMechanism:    &defaultKafkaSASLMechanism,
 	}
 }
 
