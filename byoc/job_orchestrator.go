@@ -65,7 +65,8 @@ func (bs *BYOCOrchestratorServer) RegisterCapability() http.Handler {
 		w.Write([]byte("ok"))
 		cap.SetWorkerOptions(cap.WorkerOptions)
 		optsJSON, _ := json.Marshal(cap.WorkerOptions)
-		clog.Infof(context.TODO(), "registered capability remoteAddr=%v capability=%v url=%v price=%v worker_options=%v", remoteAddr, cap.Name, cap.Url, big.NewRat(cap.PricePerUnit, cap.PriceScaling), string(optsJSON))
+		hwJSON, _ := json.Marshal(cap.Hardware)
+		clog.Infof(context.TODO(), "registered capability remoteAddr=%v capability=%v url=%v price=%v worker_options=%v hardware=%v", remoteAddr, cap.Name, cap.Url, big.NewRat(cap.PricePerUnit, cap.PriceScaling), string(optsJSON), string(hwJSON))
 		if bs.pendingEvents != nil {
 			bs.pendingEvents.Enqueue("worker_registered", map[string]interface{}{
 				"capability":            cap.Name,

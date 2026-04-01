@@ -11,18 +11,20 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/golang/glog"
+	"github.com/livepeer/go-livepeer/ai/worker"
 	"github.com/livepeer/go-livepeer/trickle"
 )
 
 type ExternalCapability struct {
-	Name          string                   `json:"name"`
-	Description   string                   `json:"description"`
-	Url           string                   `json:"url"`
-	Capacity      int                      `json:"capacity"`
-	PricePerUnit  int64                    `json:"price_per_unit"`
-	PriceScaling  int64                    `json:"price_scaling"`
-	PriceCurrency string                   `json:"currency"`
-	WorkerOptions []map[string]interface{} `json:"worker_options,omitempty"`
+	Name          string                        `json:"name"`
+	Description   string                        `json:"description"`
+	Url           string                        `json:"url"`
+	Capacity      int                           `json:"capacity"`
+	PricePerUnit  int64                         `json:"price_per_unit"`
+	PriceScaling  int64                         `json:"price_scaling"`
+	PriceCurrency string                        `json:"currency"`
+	WorkerOptions []map[string]interface{}      `json:"worker_options,omitempty"`
+	Hardware      []worker.HardwareInformation  `json:"hardware,omitempty"`
 
 	price *AutoConvertedPrice
 
@@ -422,6 +424,21 @@ func (extCaps *ExternalCapabilities) GetAllWorkerOptionsByCapability() map[strin
 		}
 	}
 	return result
+}
+
+// GetAllHardware returns hardware information from every registered BYOC runner
+// across all capabilities, flattened into a single slice. Returns nil if no
+// hardware has been reported.
+func (extCaps *ExternalCapabilities) GetAllHardware() []worker.HardwareInformation {
+	extCaps.capm.Lock()
+	defer extCaps.capm.Unlock()
+	var hw []worker.HardwareInformation
+	for _, runners := range extCaps.Capabilities {
+		for _, cap := range runners {
+			hw = append(hw, cap.Hardware...)
+		}
+	}
+	return hw
 }
 
 func (extCaps *ExternalCapabilities) RegisterCapability(extCapability string) (*ExternalCapability, error) {
