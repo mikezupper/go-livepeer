@@ -69,10 +69,79 @@ func (ls *LivepeerServer) SignOrchestratorInfo(w http.ResponseWriter, r *http.Re
 	_ = json.NewEncoder(w).Encode(results)
 }
 
+// SignBYOCJobRequest is the JSON body accepted by POST /sign-byoc-job.
+// The signer signs Request + Parameters with the gateway's eth key, mirroring
+// byoc/utils.go::(*gatewayJob).sign() on the gateway side. The orchestrator's
+// byoc/job_orchestrator.go::verifyJobCreds reconstructs the same message and
+// recovers the sender from Sig.
+type SignBYOCJobRequest struct {
+	// Request is the user's request body serialized as a JSON string, exactly
+	// as it will appear in JobRequest.Request.
+	Request string `json:"request"`
+	// Parameters is the JobParameters struct serialized as a JSON string,
+	// exactly as it will appear in JobRequest.Parameters.
+	Parameters string `json:"parameters"`
+}
+
+// SignBYOCJobResponse is the JSON body returned by POST /sign-byoc-job.
+// Sender is the signer's eth address in EIP-55 mixed-case; callers MUST
+// preserve the casing verbatim — any lowercase round-trip breaks the
+// orchestrator's signature recovery.
+type SignBYOCJobResponse struct {
+	Sender    string `json:"sender"`
+	Signature string `json:"signature"`
+}
+
+// SignBYOCJob signs a BYOC job request payload using the remote signer's eth
+// key. Called once per BYOC job (not cached across requests) because the
+// Request/Parameters payload differs per call.
+//
+// The gateway-side equivalent is byoc/utils.go::(*gatewayJob).sign(), which
+// does the same Sign(Request + Parameters) operation using a locally-held
+// eth key. This endpoint lets keyless gateways (e.g. livepeer-openai-byoc)
+// route BYOC jobs without holding private key material.
+func (ls *LivepeerServer) SignBYOCJob(w http.ResponseWriter, r *http.Request) {
+	ctx := clog.AddVal(r.Context(), "request_id", string(core.RandomManifestID()))
+	remoteAddr := getRemoteAddr(r)
+
+	var req SignBYOCJobRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		clog.Errorf(ctx, "Failed to decode SignBYOCJobRequest err=%q", err)
+		respondJsonError(ctx, w, err, http.StatusBadRequest)
+		return
+	}
+
+	// Not signing with empty message — catches obvious client bugs early.
+	if req.Request == "" && req.Parameters == "" {
+		err := fmt.Errorf("sign-byoc-job requires non-empty request or parameters")
+		respondJsonError(ctx, w, err, http.StatusBadRequest)
+		return
+	}
+
+	gw := core.NewBroadcaster(ls.LivepeerNode)
+	sig, err := gw.Sign([]byte(req.Request + req.Parameters))
+	if err != nil {
+		clog.Errorf(ctx, "Failed to sign BYOC job err=%q", err)
+		respondJsonError(ctx, w, err, http.StatusInternalServerError)
+		return
+	}
+
+	clog.Info(ctx, "BYOC job signature issued", "ip", remoteAddr, "request_len", len(req.Request), "parameters_len", len(req.Parameters))
+
+	resp := SignBYOCJobResponse{
+		Sender:    gw.Address().Hex(), // EIP-55 mixed-case — do not lowercase
+		Signature: "0x" + hex.EncodeToString(sig),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 // StartRemoteSignerServer starts the HTTP server for remote signer mode
 func StartRemoteSignerServer(ls *LivepeerServer, bind string) error {
 	// Register the remote signer endpoints
 	ls.HTTPMux.Handle("POST /sign-orchestrator-info", http.HandlerFunc(ls.SignOrchestratorInfo))
+	ls.HTTPMux.Handle("POST /sign-byoc-job", http.HandlerFunc(ls.SignBYOCJob))
 	ls.HTTPMux.Handle("POST /generate-live-payment", http.HandlerFunc(ls.GenerateLivePayment))
 	if ls.LivepeerNode.RemoteDiscovery {
 		rdp := RemoteDiscoveryConfig{

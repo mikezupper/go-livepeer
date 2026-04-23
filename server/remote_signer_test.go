@@ -5,10 +5,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/golang/protobuf/proto"
 	"github.com/livepeer/go-livepeer/common"
@@ -965,5 +968,82 @@ func TestRemoteSigner_Discovery_RefreshesAfterInterval(t *testing.T) {
 		require.Len(resp, 1)
 		require.Equal("https://orch-b.example.com:8935", resp[0].Address)
 		require.Equal([]string{"live-video-to-video/model-b"}, resp[0].Capabilities)
+	})
+}
+
+func TestSignBYOCJob(t *testing.T) {
+	require := require.New(t)
+
+	ethClient := newTestEthClient(t)
+	node, _ := core.NewLivepeerNode(ethClient, "", nil)
+	ls := &LivepeerServer{LivepeerNode: node}
+
+	call := func(t *testing.T, body []byte) (*httptest.ResponseRecorder, SignBYOCJobResponse) {
+		t.Helper()
+		r := httptest.NewRequest(http.MethodPost, "/sign-byoc-job", bytes.NewReader(body))
+		rr := httptest.NewRecorder()
+		ls.SignBYOCJob(rr, r)
+		var resp SignBYOCJobResponse
+		if rr.Code == http.StatusOK {
+			require.NoError(json.NewDecoder(rr.Body).Decode(&resp))
+		}
+		return rr, resp
+	}
+
+	t.Run("round-trips through Ethereum personal-sign recovery", func(t *testing.T) {
+		// Payload shape mirrors byoc/utils.go:36 — Request + Parameters concat.
+		req := SignBYOCJobRequest{
+			Request:    `{"hello":"world"}`,
+			Parameters: `{"options_filter":{"model":"gpt-4o"}}`,
+		}
+		body, err := json.Marshal(req)
+		require.NoError(err)
+
+		rr, resp := call(t, body)
+		require.Equal(http.StatusOK, rr.Code)
+		require.NotEmpty(resp.Sender)
+		require.True(strings.HasPrefix(resp.Signature, "0x"))
+
+		// Recover the address using exactly the orchestrator's verification
+		// path: core.orchestrator.VerifySig does
+		//     lpcrypto.VerifySig(addr, Keccak256(msg), sig)
+		// and lpcrypto.VerifySig then does TextHash(inner) internally. So
+		// the full signed digest is TextHash(Keccak256(Request+Parameters)).
+		sigBytes, err := hex.DecodeString(strings.TrimPrefix(resp.Signature, "0x"))
+		require.NoError(err)
+		require.Len(sigBytes, 65)
+		sigBytes[64] -= 27 // Ethereum personal-sign adds 27 to v
+
+		keccak := ethcrypto.Keccak256([]byte(req.Request + req.Parameters))
+		recoveredPub, err := crypto.Ecrecover(accounts.TextHash(keccak), sigBytes)
+		require.NoError(err)
+		recoveredAddr := ethcommon.BytesToAddress(ethcrypto.Keccak256(recoveredPub[1:])[12:])
+		require.Equal(ethcommon.HexToAddress(resp.Sender), recoveredAddr)
+	})
+
+	t.Run("rejects empty request and parameters", func(t *testing.T) {
+		body, err := json.Marshal(SignBYOCJobRequest{})
+		require.NoError(err)
+		rr, _ := call(t, body)
+		require.Equal(http.StatusBadRequest, rr.Code)
+	})
+
+	t.Run("accepts request-only payload", func(t *testing.T) {
+		body, err := json.Marshal(SignBYOCJobRequest{Request: `{"x":1}`})
+		require.NoError(err)
+		rr, _ := call(t, body)
+		require.Equal(http.StatusOK, rr.Code)
+	})
+
+	t.Run("accepts parameters-only payload", func(t *testing.T) {
+		body, err := json.Marshal(SignBYOCJobRequest{Parameters: `{"y":2}`})
+		require.NoError(err)
+		rr, _ := call(t, body)
+		require.Equal(http.StatusOK, rr.Code)
+	})
+
+	t.Run("rejects malformed JSON body", func(t *testing.T) {
+		rr, _ := call(t, []byte("{not json"))
+		require.Equal(http.StatusBadRequest, rr.Code)
 	})
 }
